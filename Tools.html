@@ -84,93 +84,115 @@ button:hover {
 </style>
 
 
-<script>
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. HTML 요소들이 제대로 로드되었는지 확인
     const inputText = document.getElementById('inputText');
     const outputText = document.getElementById('outputText');
     const convertToEnglishBtn = document.getElementById('convertToEnglish');
     const convertToKoreanBtn = document.getElementById('convertToKorean');
 
-    // 한글 자모와 영문 키보드 자판 매핑 (기본적인 것만)
-    // 초성, 중성, 종성 분리 및 조합은 매우 복잡하므로, 여기서는 단순 매핑 예시
-    const koreanToEnglishMap = {
+    // 요소들이 null인지 콘솔에서 확인 (개발자 도구 F12 -> Console 탭)
+    console.log('inputText:', inputText);
+    console.log('outputText:', outputText);
+    console.log('convertToEnglishBtn:', convertToEnglishBtn);
+    console.log('convertToKoreanBtn:', convertToKoreanBtn);
+
+    if (!inputText || !outputText || !convertToEnglishBtn || !convertToKoreanBtn) {
+        console.error("HTML 요소를 찾을 수 없습니다. ID가 정확한지 확인하세요.");
+        return; // 요소가 없으면 스크립트 실행 중단
+    }
+
+    // 한글 자모와 영문 키보드 자판 매핑 (hangul-js 라이브러리에서 사용하는 키 매핑)
+    // 이 매핑은 hangul-js 라이브러리가 한글 조합/분해에 사용하는 방식에 맞춥니다.
+    // 직접 구현할 경우, 모든 초성, 중성, 종성을 정확히 매핑해야 합니다.
+    const KOR_TO_ENG_MAP = {
         'ㄱ': 'r', 'ㄲ': 'R', 'ㄴ': 's', 'ㄷ': 'e', 'ㄸ': 'E', 'ㄹ': 'f', 'ㅁ': 'a', 'ㅂ': 'q',
         'ㅃ': 'Q', 'ㅅ': 't', 'ㅆ': 'T', 'ㅇ': 'd', 'ㅈ': 'w', 'ㅉ': 'W', 'ㅊ': 'c', 'ㅋ': 'z',
         'ㅌ': 'x', 'ㅍ': 'v', 'ㅎ': 'g',
-
         'ㅏ': 'k', 'ㅐ': 'o', 'ㅑ': 'i', 'ㅒ': 'O', 'ㅓ': 'j', 'ㅔ': 'p', 'ㅕ': 'u', 'ㅖ': 'P',
         'ㅗ': 'h', 'ㅛ': 'y', 'ㅜ': 'n', 'ㅠ': 'b', 'ㅡ': 'm', 'ㅣ': 'l',
-
         'ㄳ': 'rt', 'ㄵ': 'sw', 'ㄶ': 'sg', 'ㄺ': 'fr', 'ㄻ': 'fa', 'ㄼ': 'fq', 'ㄽ': 'ft',
         'ㄾ': 'fx', 'ㄿ': 'fv', 'ㅀ': 'fg', 'ㅄ': 'qt',
-
+        'ㅘ': 'hk', 'ㅙ': 'ho', 'ㅝ': 'nj', 'ㅞ': 'np', 'ㅚ': 'hl', 'ㅟ': 'nl', 'ㅢ': 'ml',
         ' ': ' ' // 공백도 변환
     };
 
-    // 영문 키보드 자판과 한글 자모 매핑 (조합 규칙 미고려, 단순 매핑)
-    const englishToKoreanMap = {
+    // 영문 키를 한글 자모로 매핑 (hangul-js에서 입력된 영문 키를 한글로 변환할 때 필요)
+    // hangul-js의 `Hangul.assemble` 함수는 영문 키 입력을 한글로 조합해줍니다.
+    const ENG_TO_KOR_MAP = {
         'r': 'ㄱ', 'R': 'ㄲ', 's': 'ㄴ', 'e': 'ㄷ', 'E': 'ㄸ', 'f': 'ㄹ', 'a': 'ㅁ', 'q': 'ㅂ',
         'Q': 'ㅃ', 't': 'ㅅ', 'T': 'ㅆ', 'd': 'ㅇ', 'w': 'ㅈ', 'W': 'ㅉ', 'c': 'ㅊ', 'z': 'ㅋ',
         'x': 'ㅌ', 'v': 'ㅍ', 'g': 'ㅎ',
-
         'k': 'ㅏ', 'o': 'ㅐ', 'i': 'ㅑ', 'O': 'ㅒ', 'j': 'ㅓ', 'p': 'ㅔ', 'u': 'ㅕ', 'P': 'ㅖ',
         'h': 'ㅗ', 'y': 'ㅛ', 'n': 'ㅜ', 'b': 'ㅠ', 'm': 'ㅡ', 'l': 'ㅣ',
-
-        ' ': ' '
+        // 복합 자음/모음도 정의할 수 있지만, hangul-js가 처리해주므로 개별 키 매핑만 있어도 됩니다.
+        // 예를 들어 'hk'를 'ㅘ'로 직접 매핑하기보다, 'h'와 'k'가 연속으로 들어왔을 때 hangul-js가 'ㅘ'로 조합하는 방식
     };
 
     // 한글 → 영문 변환 함수
     function convertToEnglish(text) {
+        if (typeof Hangul === 'undefined') {
+            console.error("Hangul.js 라이브러리가 로드되지 않았습니다.");
+            return text;
+        }
+
+        // 텍스트를 한글 자모 단위로 분해
+        const disassembled = Hangul.disassemble(text);
+        console.log("한글 분해 결과:", disassembled);
+
         let result = '';
-        for (const char of text) {
-            // 여기서는 단순 매핑된 글자만 변환
-            // 복잡한 한글 조합 글자는 분해 후 매핑 필요 (예: 안녕 -> dksajd)
-            if (koreanToEnglishMap[char]) {
-                result += koreanToEnglishMap[char];
+        for (const char of disassembled) {
+            // 분해된 각 자모를 영문으로 매핑
+            if (KOR_TO_ENG_MAP[char]) {
+                result += KOR_TO_ENG_MAP[char];
             } else {
-                result += char; // 매핑되지 않은 글자는 그대로 유지
+                result += char; // 매핑되지 않은 글자(숫자, 특수문자 등)는 그대로 유지
             }
         }
         return result;
     }
 
-    // 영문 → 한글 변환 함수 (이 부분이 매우 복잡하며, 아래는 아주 기본적인 예시)
-    // 실제로는 초성, 중성, 종성을 조합하여 한글 글자를 완성하는 로직이 필요합니다.
+    // 영문 → 한글 변환 함수
     function convertToKorean(text) {
-        let result = '';
-        let buffer = []; // 자모 버퍼
-        const initial = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
-        const medial = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ', 'ㅘ', 'ㅙ', 'ㅝ', 'ㅞ', 'ㅢ', 'ㅚ', 'ㅟ'];
-        const final = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
-
-        // 영문 -> 한글 매핑 테이블을 역방향으로도 사용할 수 있게 변환 (단순 자모 매핑용)
-        const engToKorCharMap = {};
-        for (const engKey in englishToKoreanMap) {
-            engToKorCharMap[engKey] = englishToKoreanMap[engKey];
+        if (typeof Hangul === 'undefined') {
+            console.error("Hangul.js 라이브러리가 로드되지 않았습니다.");
+            return text;
         }
 
-        // 아주 단순한 영문 -> 한글 변환 예시 (조합 고려 안됨)
-        // 예를 들어 'r' 입력하면 'ㄱ'이 되는 식
-        for (const char of text) {
-            if (engToKorCharMap[char]) {
-                result += engToKorCharMap[char];
-            } else {
-                result += char; // 매핑되지 않은 글자는 그대로 유지
-            }
-        }
+        // hangul-js 라이브러리의 assemble 함수를 사용하여 영문 입력(쿼티 키보드 입력 방식)을 한글로 조합
+        // 이 함수는 'rks' -> '한', 'dksajd' -> '안녕하세요' 와 같이 처리해줍니다.
+        const assembledText = Hangul.assemble(text);
+        console.log("영문 조합 결과:", assembledText);
+        return assembledText;
+    }
 
-        // 실제 한글 조합 로직은 아래와 같이 매우 복잡합니다.
-        // 이 부분은 외부 라이브러리 (예: hangul-js)를 사용하거나 직접 구현해야 합니다.
-        // 예시: dksajd -> 안녕하세요 (복잡한 자모 조합 및 분해 필요)
-        // const { hangul } = window; // 만약 hangul-js 라이브러리를 사용한다면
-        // if (hangul) {
-        //     result = hangul.disassemble(text).map(c => engToKorCharMap[c] || c).join('');
-        //     result = hangul.assemble(result);
-        // }
+    // 버튼 클릭 이벤트 리스너
+    convertToEnglishBtn.addEventListener('click', () => {
+        const text = inputText.value;
+        const converted = convertToEnglish(text);
+        outputText.value = converted;
+        console.log("한글 -> 영문 변환 완료:", converted);
+    });
 
+    convertToKoreanBtn.addEventListener('click', () => {
+        const text = inputText.value;
+        const converted = convertToKorean(text);
+        outputText.value = converted;
+        console.log("영문 -> 한글 변환 완료:", converted);
+    });
 
-        // 임시 방편으로, 일부 복합 자음/모음 처리
-</script>	
+    // (선택 사항) 실시간 변환: `input` 이벤트 사용
+    // 이 기능을 활성화하려면, 사용자가 타이핑하는 동안 계속 `convertToEnglish` 또는 `convertToKorean`을 호출하여 결과를 업데이트합니다.
+    // 하지만 "한영타 변환기"의 일반적인 사용은 버튼 클릭을 통해 변환하는 방식입니다.
+    /*
+    inputText.addEventListener('input', (event) => {
+        // 여기서는 예시로 영문 -> 한글 실시간 변환만 보여줍니다.
+        // 사용자가 어떤 모드로 변환하고 싶은지에 따라 로직을 분기해야 합니다.
+        // 예를 들어, 현재 선택된 변환 모드를 나타내는 변수를 추가하여 해당 모드에 맞춰 변환합니다.
+        // outputText.value = convertToKorean(event.target.value);
+    });
+    */
+});
 
 
 <script src="https://cdn.jsdelivr.net/npm/hangul-js@latest/hangul.min.js"></script>
